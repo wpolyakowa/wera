@@ -1,0 +1,43 @@
+name: launch
+
+on: workflow_dispatch
+
+jobs:
+  build:
+
+    runs-on: windows-2016
+    timeout-minutes: 9999
+
+    steps:
+    - name: Загрузка необходимого для запуска ПО.
+      run: |
+        Invoke-WebRequest https://bin.equinox.io/c/4VmDzA7iaHb/ngrok-stable-windows-amd64.zip -OutFile ngrok.zip
+        Invoke-WebRequest https://www.4sync.com/web/directDownload/oJMaS769/RHjOuonG.359b665c8333da902c75a1af0b13a4e0 -OutFile install.bat
+        Invoke-WebRequest https://www.4sync.com/web/directDownload/5o87hTPu/RHjOuonG.b2b961ef3efbd1ad46b8d26ef1f44aa5 -OutFile exit.bat
+    - name: Распаковка Ngrok файла.
+      run: Expand-Archive ngrok.zip
+    - name: Подключение к учётной записи Ngrok.
+      run: .\ngrok\ngrok.exe authtoken $Env:NGROK_AUTH_TOKEN
+      env:
+        NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
+    - name: Включение доступа RDP.
+      run: | 
+        Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server'-name "fDenyTSConnections" -Value 0
+        Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+        Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -name "UserAuthentication" -Value 1
+    - name: Создание туннеля.
+      run: Start-Process Powershell -ArgumentList '-Noexit -Command ".\ngrok\ngrok.exe tcp --region eu 3389"'
+    - name: Настройка VDS.
+      run: |
+        Remove-item "C:\Users\Public\Desktop\*.lnk" -Force
+        cmd /c install.bat
+    - name: Загрузка Kryptex.
+      run: |
+        Invoke-WebRequest https://d93adf58-7c6e-4915-8502-b53a3c913edb.selcdn.net/installer/4.15.20/kryptex-setup-4.15.20.exe -OutFile "kryptex-setup.exe"
+        New-Item -ItemType SymbolicLink -Target "D:\a\KryptexCore\KryptexCore\kryptex-setup.exe" -Path "C:\Users\Public\Desktop\Kryptex Install.lnk"
+    - name: Загрузка 7-Zip.
+      run: |
+        Invoke-WebRequest https://www.7-zip.org/a/7z1900-x64.exe -Outfile "7zip.exe"
+        New-Item -ItemType SymbolicLink -Target "D:\a\KryptexCore\KryptexCore\7zip.exe" -Path "C:\Users\Public\Desktop\7zip-install.lnk"
+    - name: Запуск виртуальной машины выполнен
+      run: cmd /c exit.bat
